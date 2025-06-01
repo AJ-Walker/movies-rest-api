@@ -1,0 +1,48 @@
+# Go
+# Binaries for programs
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go tool, specifically from `go build -o`
+/backend/main
+/backend/tmp/main
+
+# Go build cache
+.go/
+
+# Logs
+*.log
+/backend/tmp/build-errors.log
+/tmp/build-errors.log
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# AWS Infrastructure (Terraform)
+.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.backup
+crash.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+.terraform.lock.hcl
+
+# Environment variables
+.env
+.env.*
+.secrets
+
+# OS generated files
+.DS_Store
+Thumbs.db
