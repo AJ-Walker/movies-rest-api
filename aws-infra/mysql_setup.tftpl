@@ -1,0 +1,100 @@
+#!/bin/bash
+
+echo "Starting MySQL setup script..."
+
+# Update packages and install necessary tools (MySQL server, jq, unzip)
+sudo apt update -y
+sudo apt install -y mysql-server jq unzip
+
+# Install aws cli
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Get data from terraform
+MYSQL_DB_SECRET_ID="${mysql_db_secret_arn}" # AWS Secret Manager Secret ARN
+DB_NAME="${mysql_db_name}" # Database Name
+DB_USER="${mysql_db_user}" # Database User
+AWS_REGION="${aws_region}" # AWS Region
+MYSQL_ROOT_SECRET_KEY="${mysql_root_secret_key}"
+MYSQL_USER_SECRET_KEY="${mysql_user_secret_key}"
+MYSQL_SCRIPT="${sql_script}"
+
+# Retrieve Passwords from AWS Secrets Manager
+echo "Retrieving passwords from AWS Secrets Manager..."
+
+# Fetch the entire secret string (This is JSON Object)
+SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$MYSQL_DB_SECRET_ID" --query SecretString --output text --region "$AWS_REGION")
+
+# Check if jq can parse the json output
+if ! echo "$SECRET_JSON" | jq -e . > /dev/null; then
+  echo "ERROR: Secret retrieved is not valid JSON. Secret ID: $MYSQL_DB_SECRET_ID"
+  exit 1
+fi
+
+# Parse the SECRET_JSON to get individual passwords
+MYSQL_ROOT_PASSWORD=$(echo "$SECRET_JSON" | jq -r --arg key "$MYSQL_ROOT_SECRET_KEY" '.[$key]')
+MYSQL_USER_PASSWORD=$(echo "$SECRET_JSON" | jq -r --arg key "$MYSQL_USER_SECRET_KEY" '.[$key]')
+
+# Check if passwords were retrieved successfully
+if [ -z "$MYSQL_ROOT_PASSWORD" ] || [ -z "$MYSQL_USER_PASSWORD" ]; then
+    echo "ERROR: Failed to retrieve one or more passwords from Secrets Manager."
+    exit 1
+fi
+
+# --- Configuring MySQL using retrieved passwords ---
+
+echo "Securing MySQL root user..."
+
+# The first 'ALTER USER' command leverages auth_socket for the OS root user.
+sudo mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASSWORD';"
+
+# Create a temporary .cnf file for MySQL root user operations
+# This prevents the actual password from appearing with -p in subsequent root commands.
+ROOT_MY_CNF="/tmp/mysql_root_temp.cnf"
+echo "[client]" | sudo tee "$ROOT_MY_CNF" > /dev/null
+echo "user=root" | sudo tee -a "$ROOT_MY_CNF" > /dev/null
+echo "password=$MYSQL_ROOT_PASSWORD" | sudo tee -a "$ROOT_MY_CNF" > /dev/null
+sudo chmod 600 "$ROOT_MY_CNF" # Crucial: set secure permissions
+
+echo "Creating database '$DB_NAME' and user '$DB_USER'..."
+sudo mysql --defaults-extra-file="$ROOT_MY_CNF" -e "FLUSH PRIVILEGES;" # Reloads the privilege tables (from the mysql database) into memory
+sudo mysql --defaults-extra-file="$ROOT_MY_CNF" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+sudo mysql --defaults-extra-file="$ROOT_MY_CNF" -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$MYSQL_USER_PASSWORD';"
+sudo mysql --defaults-extra-file="$ROOT_MY_CNF" -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+sudo mysql --defaults-extra-file="$ROOT_MY_CNF" -e "FLUSH PRIVILEGES;" # Reloads the privilege tables (from the mysql database) into memory
+
+# Remove the temporary root password file
+sudo rm "$ROOT_MY_CNF"
+
+# Unset root password env variable
+unset MYSQL_ROOT_PASSWORD
+
+# --- Executing Schema and Data Setup for your user ---
+
+# Create a temporary .cnf file for MySQL user operations
+# This prevents the actual password from appearing with -p in subsequent user commands.
+echo "Creating .cnf file for your user..."
+USER_MY_CNF="/tmp/mysql_user_temp.cnf"
+echo "[client]" | sudo tee "$USER_MY_CNF" > /dev/null
+echo "user=$DB_USER" | sudo tee -a "$USER_MY_CNF" > /dev/null
+echo "password=$MYSQL_USER_PASSWORD" | sudo tee -a "$USER_MY_CNF" > /dev/null
+sudo chmod 600 "$USER_MY_CNF"
+
+# --- Write the SQL script content to a temporary file on the EC2 instance ---
+
+echo "Writing embedded SQL script to /tmp/scripts.sql on EC2..."
+cat << SQL_CONTENT_INJECTION_EOF > /tmp/scripts.sql
+$MYSQL_SCRIPT
+SQL_CONTENT_INJECTION_EOF
+
+echo "Executing /tmp/scripts.sql against $DB_NAME using $DB_USER's .cnf..."
+sudo mysql --defaults-extra-file="$USER_MY_CNF" "$DB_NAME" < /tmp/scripts.sql
+
+# Remove the temporary password file
+sudo rm "$USER_MY_CNF"
+
+# Unset user password env variable
+unset MYSQL_USER_PASSWORD
+
+echo "MySQL setup complete!"
