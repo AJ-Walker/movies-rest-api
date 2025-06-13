@@ -1,0 +1,203 @@
+#!/bin/bash
+
+echo "Starting Go application deployment on EC2..."
+
+# Update packages and install necessary tools (nginx, unzip, git)
+apt update -y
+apt install -y nginx unzip git
+
+# Install aws cli
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Go Installation
+
+# remove existing go installation
+rm -rf /usr/local/go
+
+# Download the specified Go version
+curl -OL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz
+
+# Extract Go to /usr/local
+tar -C /usr/local -xzf go1.24.4.linux-amd64.tar.gz
+
+rm go1.24.4.linux-amd64.tar.gz # remove go tarball file
+
+# Set up Go environment variables for root user
+export PATH=$PATH:/usr/local/go/bin
+
+# Add GO to the bash profile for the ubuntu user
+echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/ubuntu/.bashrc
+source ~/.bashrc # Reloads the .bashrc file in current terminal session to apply changes
+
+# Add Go to the system's PATH
+# echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+# source ~/.profile # Reloads the .profile file in current terminal session to apply changes 
+
+# Create a script in /etc/profile.d/ which is sourced by all login shells.
+# GO_PATH_SCRIPT="/etc/profile.d/go_path.sh"
+# echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee "$GO_PATH_SCRIPT" > /dev/null
+# sudo chmod +x "$GO_PATH_SCRIPT" # Make the script executable
+
+# Verify Go installation
+go version
+
+echo "Cloning the repo and building the Go application..."
+
+# Get data from terraform
+APP_NAME="${app_name}" # Application Name
+REPO_URL="${repo_url}" # Repository Url
+REPO_NAME="${repo_name}" # Repository Name
+DB_NAME="${mysql_db_name}" # Database Name
+DB_USER="${mysql_db_user}" # Database User
+MYSQL_USER_SECRET_KEY="${mysql_user_secret_key}" # MySQL User Secret Key
+MYSQL_DB_SECRET_ID="${mysql_db_secret_arn}" # AWS Secret Manager Secret ARN
+APP_SOURCE_DIR="/home/ubuntu/$APP_NAME-code-be" # Directory where the repo will be cloned 
+
+APP_BUILD_DIR="/home/ubuntu/$APP_NAME-build"
+APP_BINARY_NAME="$APP_NAME-v0.0.1" # Name of the built Go binary
+# CLONED_SOURCE_DIR="/home/ubuntu/$APP_NAME-code-be" # Directory where the repo will be cloned
+
+# Clone the repo
+echo "Cloning repo from $REPO_URL..."
+if ! git clone "$REPO_URL" "$APP_SOURCE_DIR"; then
+    echo "Error: Failed to clone repository from $REPO_URL. Please check the URL and network connectivity."
+    exit 1
+fi
+
+# Create the build directory and ensure 'ubuntu' user owns it
+mkdir -p "$APP_BUILD_DIR"
+# chown ubuntu:ubuntu "$APP_BUILD_DIR"
+# chmod 755 "$APP_BUILD_DIR"
+
+# Set GOPATH for the build process and create the directory
+export GOPATH="/home/ubuntu/go"
+export GOCACHE="/home/ubuntu/.cache/go-build"
+mkdir -p "$GOPATH" "$GOCACHE"
+
+# Navigate to the code repo folder to build the Go application
+echo "Building Go application in $APP_SOURCE_DIR..."
+cd "$APP_SOURCE_DIR/backend"
+
+echo "Current directory: $(pwd)"
+
+echo "$APP_BUILD_DIR/$APP_BINARY_NAME"
+
+# Best Practice: Tidy dependencies to ensure the module cache is populated
+go mod tidy
+
+# Build the Go application for Linux AMD64 architecture
+go build -o "$APP_BUILD_DIR/$APP_BINARY_NAME" .
+
+if [ $? -ne 0 ]; then
+    echo "Go application build failed. Check your Go source code."
+    exit 1
+fi
+echo "Go application built successfully."
+
+# Ensure the built binary is executable and owned by ubuntu
+# chown ubuntu:ubuntu "$APP_BUILD_DIR/$APP_BINARY_NAME"
+# chmod +x "$APP_BUILD_DIR/$APP_BINARY_NAME"
+
+# Create the .env file in the build directory
+ENV_FILE="$APP_BUILD_DIR/.env"
+echo "Creating .env file in $APP_BUILD_DIR..."
+cat <<EOF > "$ENV_FILE"
+DB_USER=$DB_USER
+DB_NAME=$DB_NAME
+DB_SECRET_KEY=$MYSQL_USER_SECRET_KEY
+SECRET_NAME=$MYSQL_DB_SECRET_ID
+EOF
+
+# Set correct ownership for all created files to the 'ubuntu' user
+chown -R ubuntu:ubuntu "/home/ubuntu"
+
+# Change back to ubuntu's home directory
+cd /home/ubuntu
+
+echo "Setting up Systemd Service file for $APP_NAME application..."
+
+SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
+
+# Create the systemd service file
+cat <<EOF > "$SERVICE_FILE"
+[Unit]
+Description=My Go Application Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=$APP_BUILD_DIR
+ExecStart=$APP_BUILD_DIR/$APP_BINARY_NAME
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd daemon to pick up the new service file
+systemctl daemon-reload
+
+# Enable the service to start on boot
+systemctl enable $APP_NAME.service
+
+# Start the Go application service
+systemctl start $APP_NAME.service
+
+echo "Systemd service '$APP_NAME.service' setup complete."
+echo "Current status of the service:"
+systemctl status $APP_NAME.service --no-pager
+
+echo "Configuring Nginx as a reverse proxy"
+
+# Create Nginx configuration file for the Go application
+NGINX_APP_CONF="/etc/nginx/conf.d/$APP_NAME.conf"
+
+cat <<EOF > "$NGINX_APP_CONF"
+server {
+    listen 80;
+    server_name _; # Listen on all available hostnames/IPs
+
+    location / {
+        proxy_pass http://localhost:8080; # Your Go Gin app's default port
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+
+    error_log /var/log/nginx/$APP_NAME-error.log;
+    access_log /var/log/nginx/$APP_NAME-access.log;
+}
+EOF
+
+# Modify the main Nginx configuration to comment out the default sites-enabled include
+# This ensures Nginx only uses configs from /etc/nginx/conf.d/
+NGINX_MAIN_CONF="/etc/nginx/nginx.conf"
+sed -i '/^[^#]*include \/etc\/nginx\/sites-enabled\/\*\;/s/^/#/' "$NGINX_MAIN_CONF"
+
+# Test Nginx configuration for syntax errors
+echo "Testing Nginx configuration..."
+nginx -t
+if [ $? -ne 0 ]; then
+    echo "Nginx configuration test failed. Please check /etc/nginx/conf.d/$APP_NAME.conf"
+    exit 1
+fi
+echo "Nginx configuration test successful."
+
+# Restart Nginx to apply changes
+systemctl restart nginx
+
+# Enable Nginx to start on boot
+systemctl enable nginx
+
+echo "--- Deployment complete! ---"
+echo "Your Go application should now be running and accessible via Nginx on port 80."
+echo "You can check the Go app's status with: sudo systemctl status movies-app.service"
+echo "And view its logs with: sudo journalctl -u movies-app.service -f"
+echo "Nginx status: sudo systemctl status nginx"

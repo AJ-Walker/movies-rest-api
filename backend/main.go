@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -31,13 +32,18 @@ func main() {
 		log.Fatalf("Cannot load environment variables. Error occured: %v", err)
 	}
 
-	// DB connect and ping
-	if err := DBConnectAndPing(); err != nil {
-		log.Fatal(err)
-	}
-
 	// Initialize AWS clients
 	InitAWSClients()
+
+	db_password, err := GetSecretByKey(os.Getenv("SECRET_ARN"), os.Getenv("DB_SECRET_KEY"))
+	if err != nil {
+		log.Fatalf("%s", err.Error())
+	}
+
+	// DB connect and ping
+	if err := DBConnectAndPing(db_password); err != nil {
+		log.Fatal(err)
+	}
 
 	// Initialize router
 	router := gin.Default()

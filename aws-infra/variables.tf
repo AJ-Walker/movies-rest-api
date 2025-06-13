@@ -43,7 +43,6 @@ variable "availability_zone" {
 variable "my_ip" {
   description = "My Ip address"
   type        = string
-  default     = "103.86.181.75/32"
 }
 
 # variable "mysql_db_creds" {
@@ -63,6 +62,12 @@ variable "database_name" {
   default     = "movies_db"
 }
 
+variable "database_user" {
+  description = "The database user"
+  type        = string
+  default     = "abhay"
+}
+
 variable "mysql_root_user_password" {
   description = "The password for root user."
   type        = string
@@ -73,4 +78,16 @@ variable "mysql_abhay_user_password" {
   description = "The password for abhay user."
   type        = string
   sensitive   = true
+}
+
+variable "repo_url" {
+  description = "The url of the repository where the Go backend code is stored"
+  type        = string
+  default     = "https://github.com/AJ-Walker/movies-rest-api"
+}
+
+variable "repo_name" {
+  description = "The name of the repository where the Go backend code is stored"
+  type        = string
+  default     = "movies-rest-api"
 }
