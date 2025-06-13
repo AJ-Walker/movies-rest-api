@@ -20,7 +20,7 @@ locals {
   files = fileset("${path.module}/${var.local_images_folder}", "*")
 
   mysql_root_user_secret_key = "mysql-root-user-password"
-  mysql_user_secret_key = "mysql-abhay-user-password"
+  mysql_user_secret_key      = "mysql-abhay-user-password"
 }
 
 // VPC
@@ -99,10 +99,10 @@ resource "aws_route_table_association" "public_rtb_subnet_association" {
 resource "aws_route_table" "movies_app_private_rtb" {
   vpc_id = aws_vpc.movies_app_vpc.id
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat_gateway.id
-  }
+  # route {
+  #   cidr_block = "0.0.0.0/0"
+  #   nat_gateway_id = aws_nat_gateway.nat_gateway.id
+  # }
 
   tags = {
     Name = "${var.project_name}-private-rtb"
@@ -116,29 +116,63 @@ resource "aws_route_table_association" "private_rtb_subnet_association" {
 }
 
 // Nat Gateway
-resource "aws_nat_gateway" "nat_gateway" {
-  subnet_id = aws_subnet.movies_app_public_subnet_1a.id
-  allocation_id = aws_eip.elastic_ip.allocation_id
+# resource "aws_nat_gateway" "nat_gateway" {
+#   subnet_id = aws_subnet.movies_app_public_subnet_1a.id
+#   allocation_id = aws_eip.elastic_ip.allocation_id
 
-  depends_on = [ aws_internet_gateway.movies_app_igw ]
+#   depends_on = [ aws_internet_gateway.movies_app_igw ]
 
-  tags = {
-    Name = "${var.project_name}-nat-gw"
-  }
-}
+#   tags = {
+#     Name = "${var.project_name}-nat-gw"
+#   }
+# }
 
 # Elastic IP
-resource "aws_eip" "elastic_ip" {
-  
-  depends_on = [ aws_internet_gateway.movies_app_igw ]
+# resource "aws_eip" "elastic_ip" {
 
-  tags = {
-    Name = "${var.project_name}-elastic-ip"
-  }
-}
+#   depends_on = [ aws_internet_gateway.movies_app_igw ]
+
+#   tags = {
+#     Name = "${var.project_name}-elastic-ip"
+#   }
+# }
 
 // EC2 - MySQL DB Instance
-resource "aws_instance" "mysql_db_ec2" {
+# resource "aws_instance" "mysql_db_ec2" {
+#   ami           = "ami-0e35ddab05955cf57" // Ubuntu Server 24.04 LTS (HVM)
+#   instance_type = "t2.micro"
+
+#   associate_public_ip_address = true
+#   availability_zone           = var.availability_zone
+
+#   subnet_id = aws_subnet.movies_app_public_subnet_1a.id
+
+#   key_name = aws_key_pair.movies_app_kp.key_name
+
+#   vpc_security_group_ids = [aws_security_group.ec2_ssh_allow_sg.id]
+
+#   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
+
+#   tags = {
+#     Name = "${var.project_name}-instance"
+#   }
+
+#   // mysql setup user-data
+#   user_data = templatefile("${path.module}/mysql_setup.tftpl", {
+#     mysql_db_secret_arn   = aws_secretsmanager_secret.mysql_db_secrets.arn,
+#     aws_region            = var.aws_region,
+#     mysql_db_name         = var.database_name,
+#     mysql_db_user         = "abhay"
+#     sql_script            = file("${path.module}/scripts.sql"),
+#     mysql_root_secret_key = local.mysql_root_user_secret_key,
+#     mysql_user_secret_key = local.mysql_user_secret_key
+#   })
+
+#   user_data_replace_on_change = true
+# }
+
+// EC2 - Go backend Instance
+resource "aws_instance" "go_backend_ec2" {
   ami           = "ami-0e35ddab05955cf57" // Ubuntu Server 24.04 LTS (HVM)
   instance_type = "t2.micro"
 
@@ -157,15 +191,15 @@ resource "aws_instance" "mysql_db_ec2" {
     Name = "${var.project_name}-instance"
   }
 
-  // mysql setup user-data
-  user_data = templatefile("${path.module}/mysql_setup.tftpl", {
-    mysql_db_secret_arn   = aws_secretsmanager_secret.mysql_db_secrets.arn,
-    aws_region            = var.aws_region,
+  // go backend setup user-data
+  user_data = templatefile("${path.module}/go_backend_setup.tftpl", {
+    app_name              = var.project_name,
+    repo_url              = var.repo_url,
+    repo_name             = var.repo_name,
     mysql_db_name         = var.database_name,
-    mysql_db_user         = "abhay"
-    sql_script            = file("${path.module}/scripts.sql"),
-    mysql_root_secret_key = local.mysql_root_user_secret_key,
-    mysql_user_secret_key = local.mysql_user_secret_key
+    mysql_db_user         = var.database_user,
+    mysql_user_secret_key = local.mysql_user_secret_key,
+    secret_name           = aws_secretsmanager_secret.mysql_db_secrets.arn
   })
 
   user_data_replace_on_change = true
@@ -228,6 +262,15 @@ resource "aws_vpc_security_group_ingress_rule" "allow_ssh_inbound" {
   cidr_ipv4         = var.my_ip
 }
 
+resource "aws_vpc_security_group_ingress_rule" "allow_http" {
+  security_group_id = aws_security_group.ec2_ssh_allow_sg.id
+  description       = aws_security_group.ec2_ssh_allow_sg.description
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+  cidr_ipv4         = var.my_ip
+}
+
 // Allow all outbound sg rule
 resource "aws_vpc_security_group_egress_rule" "allow_all_outbound" {
   security_group_id = aws_security_group.ec2_ssh_allow_sg.id
@@ -282,6 +325,6 @@ resource "aws_secretsmanager_secret_version" "mysql_db_creds" {
   secret_id = aws_secretsmanager_secret.mysql_db_secrets.id
   secret_string = jsonencode({
     (local.mysql_root_user_secret_key) = var.mysql_root_user_password,
-    (local.mysql_user_secret_key) = var.mysql_abhay_user_password
+    (local.mysql_user_secret_key)      = var.mysql_abhay_user_password
   })
 }

@@ -7,11 +7,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
 var (
-	BedrockClient *bedrockruntime.Client
-	S3Client      *s3.Client
+	BedrockClient       *bedrockruntime.Client
+	S3Client            *s3.Client
+	SecretManagerClient *secretsmanager.Client
 )
 
 func InitAWSClients() {
@@ -24,4 +26,5 @@ func InitAWSClients() {
 
 	BedrockClient = bedrockruntime.NewFromConfig(cfg)
 	S3Client = s3.NewFromConfig(cfg)
+	SecretManagerClient = secretsmanager.NewFromConfig(cfg)
 }

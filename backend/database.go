@@ -12,13 +12,14 @@ import (
 
 var db *sql.DB
 
-func DBConnectAndPing() error {
+func DBConnectAndPing(db_password string) error {
 	log.Print("Inside DBConnectAndPing func")
 
 	// Capture connection properties
 	cfg := mysql.Config{
-		User:   os.Getenv("DB_USER"),
-		Passwd: os.Getenv("DB_PASS"),
+		User: os.Getenv("DB_USER"),
+		// Passwd: os.Getenv("DB_PASS"),
+		Passwd: db_password,
 		Net:    "tcp",
 		Addr:   "127.0.0.1:3306",
 		DBName: os.Getenv("DB_NAME"),
