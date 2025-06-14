@@ -199,7 +199,7 @@ resource "aws_instance" "go_backend_ec2" {
     mysql_db_name         = var.database_name,
     mysql_db_user         = var.database_user,
     mysql_user_secret_key = local.mysql_user_secret_key,
-    secret_name           = aws_secretsmanager_secret.mysql_db_secrets.arn
+    mysql_db_secret_arn   = aws_secretsmanager_secret.mysql_db_secrets.arn
   })
 
   user_data_replace_on_change = true
