@@ -21,7 +21,8 @@ func DBConnectAndPing(db_password string) error {
 		// Passwd: os.Getenv("DB_PASS"),
 		Passwd: db_password,
 		Net:    "tcp",
-		Addr:   "127.0.0.1:3306",
+		// Addr:   "127.0.0.1:3306",
+		Addr:   fmt.Sprintf("%v:%v", os.Getenv("HOST"), os.Getenv("PORT")),
 		DBName: os.Getenv("DB_NAME"),
 	}
 
