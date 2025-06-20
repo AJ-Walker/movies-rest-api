@@ -34,10 +34,16 @@ variable "project_name" {
   default     = "movies-app"
 }
 
-variable "availability_zone" {
-  description = "The availability zone for the subnets"
+variable "availability_zone_1a" {
+  description = "The availability zone 1a for the subnets"
   type        = string
   default     = "ap-south-1a"
+}
+
+variable "availability_zone_1b" {
+  description = "The availability zone 1b for the subnets"
+  type        = string
+  default     = "ap-south-1b"
 }
 
 variable "my_ip" {
