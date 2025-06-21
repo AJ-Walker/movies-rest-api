@@ -396,6 +396,10 @@ resource "aws_lb_target_group" "movies_app_backend_tg" {
   target_type = "instance"
   vpc_id      = aws_vpc.movies_app_vpc.id
 
+  health_check {
+    path = "/healthcheck"
+  }
+
   tags = {
     Name = "${var.project_name}-backend-tg"
   }
