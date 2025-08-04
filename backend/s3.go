@@ -16,13 +16,12 @@ const s3Prefix = "images"
 func PutObject_S3(fileHeader *multipart.FileHeader, objectKey string) (string, error) {
 	log.Print("Inside PutObject_S3 func")
 	file, err := fileHeader.Open()
-
-	defer file.Close()
-
 	if err != nil {
 		log.Printf("Error opening file to upload: %v", err)
 		return "", err
 	}
+
+	defer file.Close()
 
 	key := fmt.Sprintf("%v/%v", s3Prefix, objectKey)
 
