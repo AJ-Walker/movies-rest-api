@@ -1,4 +1,4 @@
-# Movies REST API Backend - Index
+# Movies REST API Backend
 
 ## Project Structure
 ```
@@ -11,7 +11,6 @@ backend/
 ├── go.mod                # Go module dependencies
 ├── go.sum                # Go module checksums
 ├── main.go               # Main application entry point and HTTP routes
-├── movies-app            # Compiled binary (gitignore recommended)
 ├── s3.go                 # AWS S3 storage operations
 ├── scripts.sql           # Database schema and sample data
 ├── secret_manager.go     # AWS Secrets Manager integration
@@ -32,7 +31,7 @@ backend/
 
 **API Endpoints**:
 ```
-GET    /healthcheck           # Health status check
+GET    /healthcheck          # Health status check
 GET    /api/movies           # List all movies (optional ?year filter)
 GET    /api/movies/:movieId  # Get specific movie by ID
 POST   /api/movies           # Create new movie (with image upload)
