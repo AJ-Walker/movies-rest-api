@@ -185,7 +185,7 @@ The application integrates with **AWS Bedrock** using **Claude 3 Sonnet** to gen
 - **Caching**: Generated summaries are stored in the database
 - **Context-aware**: Uses movie title, year, and genre for better accuracy
 
-## 🔧 Local Development
+## Local Development
 
 ### Backend Development
 
