@@ -1,3 +1,4 @@
+# S3 bucket policy for public read access to movie images
 data "aws_iam_policy_document" "allow_get_s3_images_policy" {
   statement {
     sid = "AllowS3ObjectGetAccess"
@@ -13,6 +14,7 @@ data "aws_iam_policy_document" "allow_get_s3_images_policy" {
   }
 }
 
+# Trust policy allowing EC2 instances to assume IAM roles
 data "aws_iam_policy_document" "ec2_assume_role_policy_doc" {
   statement {
     sid     = "AssumeRoleAccess"
@@ -26,6 +28,7 @@ data "aws_iam_policy_document" "ec2_assume_role_policy_doc" {
   }
 }
 
+# Policy for MySQL EC2 instance to retrieve database credentials
 data "aws_iam_policy_document" "mysql_ec2_secrets_policy_doc" {
   statement {
     sid     = "AllowSecretsManagerAccess"
@@ -36,7 +39,9 @@ data "aws_iam_policy_document" "mysql_ec2_secrets_policy_doc" {
   }
 }
 
+# Comprehensive policy for backend EC2 instance permissions
 data "aws_iam_policy_document" "backend_ec2_policy_doc" {
+  # Allow access to database credentials
   statement {
     sid    = "AllowSecretsManagerAccess"
     effect = "Allow"
@@ -47,6 +52,8 @@ data "aws_iam_policy_document" "backend_ec2_policy_doc" {
       aws_secretsmanager_secret.mysql_db_secrets.arn
     ]
   }
+  
+  # Allow AI model invocation for movie recommendations/analysis
   statement {
     sid    = "AllowBedrockModelInvocation"
     effect = "Allow"
@@ -54,6 +61,8 @@ data "aws_iam_policy_document" "backend_ec2_policy_doc" {
     actions   = ["bedrock:InvokeModel"]
     resources = ["arn:aws:bedrock:ap-south-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"]
   }
+  
+  # Allow backend to upload/delete movie images
   statement {
     sid    = "AllowS3ObjectWriteDelete"
     effect = "Allow"

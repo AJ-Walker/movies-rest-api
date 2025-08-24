@@ -1,99 +1,88 @@
 variable "aws_region" {
-  description = "The aws region"
+  description = "AWS region for resource deployment"
   type        = string
   default     = "ap-south-1"
 }
 
-variable "bucket_name" {
-  description = "AWS s3 bucket name"
-  type        = string
-  default     = "movies-app-data"
-}
-
-variable "s3_images_prefix" {
-  description = "AWS s3 images folder for the image"
-  type        = string
-  default     = "images"
-}
-
-variable "local_images_folder" {
-  description = "Local folder name of the images"
-  type        = string
-  default     = "images"
-}
-
 variable "environment" {
-  description = "Current environment of the deployment (e.g., Dev, Staging, Prod)"
+  description = "Deployment environment (Dev, Staging, Prod)"
   type        = string
   default     = "Dev"
 }
 
 variable "project_name" {
-  description = "The name of the project used for resource identification and tagging"
+  description = "Project name used for resource naming and tagging"
   type        = string
   default     = "movies-app"
 }
 
+variable "bucket_name" {
+  description = "S3 bucket name for storing movie images"
+  type        = string
+  default     = "movies-app-data"
+}
+
+variable "s3_images_prefix" {
+  description = "S3 folder prefix for movie images"
+  type        = string
+  default     = "images"
+}
+
+variable "local_images_folder" {
+  description = "Local directory containing movie images to upload"
+  type        = string
+  default     = "images"
+}
+
 variable "availability_zone_1a" {
-  description = "The availability zone 1a for the subnets"
+  description = "Primary availability zone for subnets and instances"
   type        = string
   default     = "ap-south-1a"
 }
 
 variable "availability_zone_1b" {
-  description = "The availability zone 1b for the subnets"
+  description = "Secondary availability zone for ALB high availability"
   type        = string
   default     = "ap-south-1b"
 }
 
 variable "my_ip" {
-  description = "My Ip address"
+  description = "Your public IP address for secure access"
   type        = string
 }
 
-# variable "mysql_db_creds" {
-#   description = "It contains the mysql db secret key and value pair"
-#   default = {
-#     (local.mysql_root_secret_key) = "password"
-#     (local.mysql_user_secret_key) = "password"
-#   }
-#   sensitive = true
-
-#   type = map(string)
-# }
-
 variable "database_name" {
-  description = "The database name"
+  description = "MySQL database name for the movies application"
   type        = string
   default     = "movies_db"
 }
 
 variable "database_user" {
-  description = "The database user"
+  description = "MySQL application user for database access"
   type        = string
   default     = "abhay"
 }
 
 variable "mysql_root_user_password" {
-  description = "The password for root user."
+  description = "MySQL root user password (stored in Secrets Manager)"
   type        = string
   sensitive   = true
 }
 
 variable "mysql_abhay_user_password" {
-  description = "The password for abhay user."
+  description = "MySQL application user password (stored in Secrets Manager)"
   type        = string
   sensitive   = true
 }
 
 variable "repo_url" {
-  description = "The url of the repository where the Go backend code is stored"
+  description = "GitHub repository URL containing the Go backend source code"
   type        = string
   default     = "https://github.com/AJ-Walker/movies-rest-api"
 }
 
 variable "repo_name" {
-  description = "The name of the repository where the Go backend code is stored"
+  description = "Repository name for cloning and deployment"
   type        = string
   default     = "movies-rest-api"
 }

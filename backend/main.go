@@ -1,5 +1,6 @@
 package main
 
+// Import necessary packages
 import (
 	"fmt"
 	"log"
@@ -13,16 +14,23 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Movie represents a single movie record stored in the database.
+// Fields map to JSON when returned by the API. Pointer fields allow null values
+// when a value is optional or not yet populated (for example, cover image or
+// an AI-generated summary).
 type Movie struct {
 	MovieId          int     `json:"movieId"`
 	Title            string  `json:"title"`
 	ReleaseYear      uint16  `json:"releaseYear"`
 	Genre            string  `json:"genre"`
-	CoverUrl         *string `json:"coverUrl"`
-	GeneratedSummary *string `json:"generatedSummary"`
-	// GeneratedSummary null.String `json:"generatedSummary,omitempty"`
+	CoverUrl         *string `json:"coverUrl"`         // Pointer to allow null values
+	GeneratedSummary *string `json:"generatedSummary"` // Pointer to allow null values
 }
 
+// main is the program entry point. It configures logging, loads environment
+// variables, initializes AWS clients, connects to the database, and registers
+// HTTP routes. The function blocks serving HTTP on localhost:8080 until the
+// process exits.
 func main() {
 	// Set log flags (adds timestamp)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -70,12 +78,16 @@ func main() {
 	router.Run("localhost:8080") // listen and serve on localhost:8080
 }
 
-// Handler for /api/healthcheck
+// healthcheck responds with a simple liveness response used by load
+// balancers and monitoring systems. It returns HTTP 200 with {"status":"ok"}.
 func healthcheck(c *gin.Context) {
 	log.Print("Inside healthcheck")
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// getMovies handles GET /api/movies. If a "year" query parameter is provided,
+// the handler returns movies released in that year. Otherwise it returns all
+// movies. The response follows the application's standard response envelope.
 func getMovies(c *gin.Context) {
 	log.Print("Inside getMovies func")
 
@@ -103,6 +115,9 @@ func getMovies(c *gin.Context) {
 	c.JSON(http.StatusOK, response(http.StatusOK, true, "Movies fetched successfully.", result))
 }
 
+// getMovieSummary handles GET /api/movies/:movieId/summary. It returns an
+// AI-generated summary for the requested movie. If no summary exists in the
+// database, the handler triggers generation via Bedrock and persists the result.
 func getMovieSummary(c *gin.Context) {
 	log.Print("Inside getMovieSummary func")
 
@@ -125,6 +140,9 @@ func getMovieSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, response(http.StatusOK, true, "Movie summary fetched.", data))
 }
 
+// getMovieById handles GET /api/movies/:movieId and returns the full movie
+// record for the provided movieId. It validates the path parameter and returns
+// appropriate HTTP error codes when the movie is not found or on internal errors.
 func getMovieById(c *gin.Context) {
 	log.Print("Inside getMovieById func")
 
@@ -143,6 +161,10 @@ func getMovieById(c *gin.Context) {
 	c.JSON(http.StatusOK, response(http.StatusOK, true, "Movie fetched successfully", result))
 }
 
+// addMovie handles POST /api/movies. It validates the incoming payload,
+// prevents duplicate titles, optionally uploads a cover image to S3, and
+// inserts the new movie record into the database. On success it returns the
+// created resource or an appropriate error response.
 func addMovie(c *gin.Context) {
 	log.Print("Inside addMovie func")
 
@@ -216,10 +238,11 @@ func addMovie(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response(http.StatusOK, true, "Movie added successfully", nil))
-	return
-
 }
 
+// updateMovie handles PUT /api/movies/:movieId. It validates the payload and
+// the existence of the target movie, prevents title duplication, optionally
+// updates the cover image in S3, and persists updates to the database.
 func updateMovie(c *gin.Context) {
 	log.Print("Inside updateMovie func")
 
@@ -250,7 +273,7 @@ func updateMovie(c *gin.Context) {
 	log.Print(movie)
 
 	if strings.TrimSpace(strings.ToLower(movie.Title)) != strings.TrimSpace(strings.ToLower(title)) {
-		// check if movie is being created with same title
+		// Check if movie is being created with same title
 		result, _ := GetMovieByTitle_DB(title)
 
 		if strings.TrimSpace(strings.ToLower(result.Title)) == strings.TrimSpace(strings.ToLower(title)) {
@@ -273,7 +296,7 @@ func updateMovie(c *gin.Context) {
 			return
 		}
 
-		// upload file to s3
+		// Upload file to s3
 		key := fmt.Sprintf("%v%v", uuid, fileExtension)
 		log.Printf("object key: %v", key)
 
@@ -310,9 +333,11 @@ func updateMovie(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response(http.StatusOK, true, "Movie updated successfully", nil))
-	return
 }
 
+// deleteMovie handles DELETE /api/movies/:movieId. It removes the movie
+// record from the database and deletes any associated cover image from S3.
+// The handler validates that the movie exists before performing the delete.
 func deleteMovie(c *gin.Context) {
 	log.Print("Inside deleteMovie func")
 
