@@ -17,12 +17,13 @@ sudo ./aws/install
 rm -rf /usr/local/go
 
 # Download the specified Go version
-curl -OL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz
+GO_VERSION="1.24.4"
+curl -OL https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz
 
 # Extract Go to /usr/local
-tar -C /usr/local -xzf go1.24.4.linux-amd64.tar.gz
+tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
 
-rm go1.24.4.linux-amd64.tar.gz # remove go tarball file
+rm go$GO_VERSION.linux-amd64.tar.gz # remove go tarball file
 
 # Set up Go environment variables for root user
 export PATH=$PATH:/usr/local/go/bin
@@ -30,15 +31,6 @@ export PATH=$PATH:/usr/local/go/bin
 # Add GO to the bash profile for the ubuntu user
 echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/ubuntu/.bashrc
 source ~/.bashrc # Reloads the .bashrc file in current terminal session to apply changes
-
-# Add Go to the system's PATH
-# echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
-# source ~/.profile # Reloads the .profile file in current terminal session to apply changes 
-
-# Create a script in /etc/profile.d/ which is sourced by all login shells.
-# GO_PATH_SCRIPT="/etc/profile.d/go_path.sh"
-# echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee "$GO_PATH_SCRIPT" > /dev/null
-# sudo chmod +x "$GO_PATH_SCRIPT" # Make the script executable
 
 # Verify Go installation
 go version
@@ -59,7 +51,6 @@ APP_SOURCE_DIR="/home/ubuntu/$APP_NAME-code-be" # Directory where the repo will 
 
 APP_BUILD_DIR="/home/ubuntu/$APP_NAME-build"
 APP_BINARY_NAME="$APP_NAME-v0.0.1" # Name of the built Go binary
-# CLONED_SOURCE_DIR="/home/ubuntu/$APP_NAME-code-be" # Directory where the repo will be cloned
 
 # Clone the repo
 echo "Cloning repo from $REPO_URL..."
@@ -68,10 +59,8 @@ if ! git clone "$REPO_URL" "$APP_SOURCE_DIR"; then
     exit 1
 fi
 
-# Create the build directory and ensure 'ubuntu' user owns it
+# Create the build directory
 mkdir -p "$APP_BUILD_DIR"
-# chown ubuntu:ubuntu "$APP_BUILD_DIR"
-# chmod 755 "$APP_BUILD_DIR"
 
 # Set GOPATH for the build process and create the directory
 export GOPATH="/home/ubuntu/go"
@@ -86,10 +75,10 @@ echo "Current directory: $(pwd)"
 
 echo "$APP_BUILD_DIR/$APP_BINARY_NAME"
 
-# Best Practice: Tidy dependencies to ensure the module cache is populated
+# Tidy dependencies to ensure the module cache is populated
 go mod tidy
 
-# Build the Go application for Linux AMD64 architecture
+# Build the Go application
 go build -o "$APP_BUILD_DIR/$APP_BINARY_NAME" .
 
 if [ $? -ne 0 ]; then
@@ -97,10 +86,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo "Go application built successfully."
-
-# Ensure the built binary is executable and owned by ubuntu
-# chown ubuntu:ubuntu "$APP_BUILD_DIR/$APP_BINARY_NAME"
-# chmod +x "$APP_BUILD_DIR/$APP_BINARY_NAME"
 
 # Create the .env file in the build directory
 ENV_FILE="$APP_BUILD_DIR/.env"
@@ -164,6 +149,8 @@ server {
     listen 80;
     server_name _; # Listen on all available hostnames/IPs
 
+    client_max_body_size 10M;  # Allow requests up to 10 MB
+
     location / {
         proxy_pass http://localhost:8080; # Your Go Gin app's default port
         proxy_http_version 1.1;
@@ -200,8 +187,7 @@ systemctl restart nginx
 # Enable Nginx to start on boot
 systemctl enable nginx
 
-echo "--- Deployment complete! ---"
-echo "Your Go application should now be running and accessible via Nginx on port 80."
+echo "Deployment complete!"
 echo "You can check the Go app's status with: sudo systemctl status movies-app.service"
 echo "And view its logs with: sudo journalctl -u movies-app.service -f"
 echo "Nginx status: sudo systemctl status nginx"

@@ -10,8 +10,12 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
+// db is the global database connection handle.
 var db *sql.DB
 
+// DBConnectAndPing establishes a connection to the MySQL database
+// using environment variables and the provided password.
+// It returns an error if the connection or ping fails.
 func DBConnectAndPing(db_password string) error {
 	log.Print("Inside DBConnectAndPing func")
 
@@ -33,7 +37,7 @@ func DBConnectAndPing(db_password string) error {
 		return fmt.Errorf("DB Connection error: %v", err)
 	}
 
-	// check if db is connected
+	// Check if db is connected
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("DB Connection error: %v", err)
 	}
@@ -42,7 +46,7 @@ func DBConnectAndPing(db_password string) error {
 
 }
 
-// Get list of all movies from DB
+// GetAllMovies_DB returns all movies from the database.
 func GetAllMovies_DB() ([]Movie, error) {
 	log.Print("Inside GetAllMovies_DB func")
 
@@ -72,7 +76,7 @@ func GetAllMovies_DB() ([]Movie, error) {
 	return movies, nil
 }
 
-// Get list of all movies by year from DB
+// GetMoviesByYear_DB returns all movies released in the given year.
 func GetMoviesByYear_DB(year string) ([]Movie, error) {
 	log.Print("Inside GetMoviesByYear_DB func")
 
@@ -102,7 +106,8 @@ func GetMoviesByYear_DB(year string) ([]Movie, error) {
 	return movies, nil
 }
 
-// Get a single movie by movieId from DB
+// GetMovieById_DB returns a movie by its ID.
+// It returns an error if the movie is not found.
 func GetMovieById_DB(movieId string) (Movie, error) {
 	log.Print("Inside GetMovieById_DB func")
 
@@ -120,7 +125,8 @@ func GetMovieById_DB(movieId string) (Movie, error) {
 	return movie, nil
 }
 
-// Get movie summary for a specific movie from DB if not then generate a summary and then save it in DB
+// GetMovieSummary_DB returns the summary of a movie by its ID.
+// If no summary exists, it generates one using Bedrock AI and saves it.
 func GetMovieSummary_DB(movieId string) (string, error) {
 	log.Print("Inside GetMovieSummary_DB func")
 
@@ -157,7 +163,7 @@ func GetMovieSummary_DB(movieId string) (string, error) {
 	return *movie.GeneratedSummary, nil
 }
 
-// Update the movie summary based on movieId in DB
+// UpdateMovieSummary_DB updates the generated summary for a movie.
 func UpdateMovieSummary_DB(movieId int, summary string) error {
 	log.Print("Inside UpdateMovieSummary_DB func")
 
@@ -171,7 +177,8 @@ func UpdateMovieSummary_DB(movieId int, summary string) error {
 	return nil
 }
 
-// Get the movie details by movie title from DB
+// GetMovieByTitle_DB returns a movie by its title (case-insensitive).
+// It returns an error if the movie is not found.
 func GetMovieByTitle_DB(title string) (Movie, error) {
 
 	var movie Movie
@@ -188,7 +195,7 @@ func GetMovieByTitle_DB(title string) (Movie, error) {
 	return movie, nil
 }
 
-// Add the movie in the DB
+// AddMovie_DB inserts a new movie into the database.
 func AddMovie_DB(movie Movie) error {
 	log.Print("Inside AddMovie_DB func")
 
@@ -206,7 +213,7 @@ func AddMovie_DB(movie Movie) error {
 	return nil
 }
 
-// Update the movie by using the movieId in DB
+// UpdateMovieById_DB updates details of an existing movie.
 func UpdateMovieById_DB(movieId string, movie Movie) error {
 	log.Print("Inside UpdateMovieById_DB func")
 
@@ -223,7 +230,7 @@ func UpdateMovieById_DB(movieId string, movie Movie) error {
 	return nil
 }
 
-// Delete a movie by using movieId from DB
+// DeleteMovieById_DB deletes a movie from the database by its ID.
 func DeleteMovieById_DB(movieId string) error {
 	log.Print("Inside DeleteMovieById_DB func")
 
